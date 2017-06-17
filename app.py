@@ -18,23 +18,18 @@ def condor_table_to_dict(condor_table):
         except Exception:
             return str(value)
 
-    return {
+    dict_content = {
         key: to_serializable(condor_table.__dict__[key])
         for key in condor_table.__dict__.keys()
         if key is not '_sa_instance_state'
     }
+    return dict_content
 
 
 def get_all_rankings():
     db = condor_db.session()
     rankings = [
-        {
-            'eid': matrix.eid,
-            'term_document_matrix_eid': matrix.term_document_matrix_eid,
-            'kind': matrix.kind,
-            'build_options': matrix.build_options,
-            'ranking_matrix_path': matrix.ranking_matrix_path
-        }
+        condor_table_to_dict(matrix)
         for matrix in RankingMatrix.list(db)
     ]
     db.commit()
