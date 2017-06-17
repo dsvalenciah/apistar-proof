@@ -1,5 +1,7 @@
-from apistar import App, Route
+import json
+
 import condor.dbutil as condor_db
+from apistar import App, Route
 from condor.models import (
     Bibliography,
     RankingMatrix,
@@ -8,15 +10,30 @@ from condor.models import (
 )
 
 
+def condor_table_to_dict(condor_table):
+    def to_serializable(value):
+        try:
+            json.dumps(value)
+            return value
+        except Exception:
+            return str(value)
+
+    return {
+        key: to_serializable(condor_table.__dict__[key])
+        for key in condor_table.__dict__.keys()
+        if key is not '_sa_instance_state'
+    }
+
+
 def get_all_rankings():
     db = condor_db.session()
     rankings = [
         {
-            "eid": matrix.eid,
-            "term_document_matrix_eid": matrix.term_document_matrix_eid,
-            "kind": matrix.kind,
-            "build_options": matrix.build_options,
-            "ranking_matrix_path": matrix.ranking_matrix_path
+            'eid': matrix.eid,
+            'term_document_matrix_eid': matrix.term_document_matrix_eid,
+            'kind': matrix.kind,
+            'build_options': matrix.build_options,
+            'ranking_matrix_path': matrix.ranking_matrix_path
         }
         for matrix in RankingMatrix.list(db)
     ]
@@ -29,49 +46,91 @@ def get_ranking(eid):
     ranking = RankingMatrix.find_by_eid(db, eid)
     if not ranking:
         return {
-            "message": "The especified eid is not found on database"
+            'message': 'The especified eid is not found on database'
         }
     db.commit()
-    return {
-        "eid": ranking.eid,
-        "term_document_matrix_eid": ranking.term_document_matrix_eid,
-        "kind": ranking.kind,
-        "build_options": ranking.build_options,
-        "ranking_matrix_path": ranking.ranking_matrix_path
-    }
+    return condor_table_to_dict(ranking)
 
 
 def get_all_bibliographies():
-    raise NotImplementedError
+    db = condor_db.session()
+    bibliographies = [
+        condor_table_to_dict(bib)
+        for bib in Bibliography.list(db)
+    ]
+    db.commit()
+    return bibliographies
 
 
-def get_bibliography():
-    raise NotImplementedError
+def get_bibliography(eid):
+    db = condor_db.session()
+    bibliography = Bibliography.find_by_eid(db, eid)
+    if not bibliography:
+        return {
+            'message': 'The especified eid is not found on database'
+        }
+    db.commit()
+    return condor_table_to_dict(bibliography)
 
 
 def get_all_documents():
-    raise NotImplementedError
+    db = condor_db.session()
+    bibliography_eid = request.args.get('bibliography', None)
+    if not bibliography_eid:
+        return {
+            'message': 'The especified eid is not found on database'
+        }
+
+    documents = [
+        condor_table_to_dict(doc)
+        for doc in Document.list(db, bibliography_eid)
+    ]
+    db.commit()
+    return documents
 
 
-def get_document():
-    raise NotImplementedError
+def get_document(eid):
+    db = condor_db.session()
+    document = Document.find_by_eid(db, eid)
+    if not document:
+        return {
+            'message': 'The especified eid is not found on database.',
+        }
+    db.commit()
+    return condor_table_to_dict(document)
 
 
 def get_all_matrices():
-    raise NotImplementedError
+    db = condor_db.session()
+    matrices = [
+        condor_table_to_dict(mat)
+        for mat in TermDocumentMatrix.list(db)
+    ]
+    db.commit()
+    return matrices
 
 
-def get_matrix():
-    raise NotImplementedError
+def get_matrix(eid):
+    db = condor_db.session()
+    matrix = TermDocumentMatrix.find_by_eid(db, eid)
+    if not matrix:
+        return {
+            'message': 'The especified eid is not found on database'
+        }
+    db.commit()
+    return condor_table_to_dict(matrix)
 
 
 routes = [
     Route('/ranking', 'GET', get_all_rankings),
     Route('/ranking/{eid}', 'GET', get_ranking),
+
     Route('/bibliography', 'GET', get_all_bibliographies),
     Route('/bibliography/{eid}', 'GET', get_bibliography),
+
     Route('/document', 'GET', get_all_documents),
     Route('/document/{eid}', 'GET', get_document),
+
     Route('/matrix', 'GET', get_all_matrices),
     Route('/matrix/{eid}', 'GET', get_matrix)
 ]
